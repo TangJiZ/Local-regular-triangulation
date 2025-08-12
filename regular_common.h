@@ -49,10 +49,25 @@ void intersection(double A1, double B1, double C1, double A2, double B2, double 
 /// @return 两点在直线同侧true，不在同侧false
 bool same_side_judge(Point_d point1, Point_d point2, double A, double B, double C);
 
-/// @brief 
-/// @param p1 
-/// @param p2 
-/// @param c 
-/// @param x 
+/// @brief p1和c的权值平分线的方向向量计算，p1c和p2c的权值平分线共同构成c的power diagram，此方向为方向向量
+/// @param p1 计算点
+/// @param p2 参考点
+/// @param c 中心点
+/// @param x 方向向量坐标
 /// @param y 
 void dv_compute(Point_d p1, Point_d p2, Point_d c, double& x, double& y);
+
+/// @brief 两点直线公式计算
+/// @param p1 计算点
+/// @param p2 
+/// @param A 两点所在直线通用方程参数
+/// @param B 
+/// @param C 
+void line(Point_d p1, Point_d p2, double& A, double& B, double& C);
+
+/// @brief 判断点b相对于c在a的顺时针方向还是逆时针方向，叉积计算
+/// @param a 
+/// @param b 
+/// @param c 相对点
+/// @return 顺时针false，逆时针true
+bool cross_product(Point_d a, Point_d b, Point_d c);

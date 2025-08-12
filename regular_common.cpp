@@ -30,7 +30,7 @@ void weightedBisector(Point_d p1, Point_d p2, double& a, double& b, double& c)
 {
 	a = p2.x - p1.x;
 	b = p2.y - p1.y;
-	c = ((p2.x * p2.x + p2.y * p2.y) - (p1.x * p1.x + p1.y * p1.y) - (p1.w - p2.w)) / 2;
+	c = ((p1.x * p1.x + p1.y * p1.y) - (p2.x * p2.x + p2.y * p2.y) + (p2.w - p1.w)) / 2;
 }
 
 void intersection(double A1, double B1, double C1, double A2, double B2, double C2, double& x, double& y)
@@ -103,4 +103,22 @@ void dv_compute(Point_d p1, Point_d p2, Point_d c, double& x, double& y)
 			y = q.y - m.y;
 		}
 	}	
+}
+
+void line(Point_d p1, Point_d p2, double& A, double& B, double& C)
+{
+	A = p2.y - p1.y;
+	B = -(p2.x - p1.x);
+	C = p2.x * p1.y - p1.x * p2.y;
+}
+
+bool cross_product(Point_d a, Point_d b, Point_d c)
+{
+	Point_d ca = { a.x - c.x, a.y - c.y };
+	Point_d cb = { b.x - c.x, b.y - c.y };
+	double cp = ca.x * cb.y - cb.x * ca.y;
+	if (cp > 0)
+		return true;
+	else
+		return false;
 }

@@ -3,13 +3,27 @@
 
 #include "Point_d.h"
 
+/// @brief 在PCell扩展权值圆内的节点，链表存储
+struct inPCell
+{
+	Point_d* p;
+	inPCell* next;
+};
+
 /// @brief power图中边界点存储结构，链表单元结构
 struct PCell
 {
 	Point_d q;				// 边界交点，power外接圆圆心；p1,p2中存在infinate点时，用做方向向量
-	double r;				// 半径
 	Point_d* p1, * p2;		// 形成此交点的两邻居节点
 	PCell* next;				// power单元边界逆时针序的下一交点
+	inPCell* ipc = nullptr;
+	double r;				// 外扩展最大权值后的半径
+};
+
+/// @brief 圆外网格包围盒
+struct Box
+{
+	int fy_min, fy_max, fx_min, fx_max;
 };
 
 /// @brief 局部方法计算regular三角剖分类
@@ -44,16 +58,67 @@ private:
 	/// @brief 待计算点集区域划分
 	void partition();
 
-	/// @brief 外扩展计算点p的邻近节点，保证节点数量大于2，逆螺旋至少为周围8格
+	/// @brief 外扩展计算点p的邻近节点，保证节点数量大于2，逆螺旋至少为周围8格，同时获取搜索的矩形网格范围
 	/// @param p 待查找节点
 	/// @param vp 保存结果，p的邻近节点
-	void near_find(Point_d* p, std::vector<int>& vp);
+	/// @param box 最终搜索的矩形网格包围盒 
+	void near_find(Point_d* p, std::vector<int>& vp, Box& box);
 
 	/// @brief power diagram初始构造，要求交点逆时针序排列，只加入前两个节点
 	/// @param nf 邻近节点
+	/// @param c 中心节点
 	/// @param first power diagram交点链表头
 	/// @param last power diagram交点链表尾
-	void Power_diagram_build_initial(std::vector<int>& nf, PCell*& first, PCell*& last);
+	void power_diagram_build_initial(std::vector<int>& nf, Point_d c, PCell*& first, PCell*& last);
+
+	/// @brief 显示power diagram链
+	/// @param iter power diagram链开始指针
+	void show_pcell(PCell* iter);
+
+	/// @brief 向power diagram图中插入新节点，并更新图结构，判断中心点是否为多余，可继续计算
+	/// @param p 插入节点
+	/// @param c 中心节点
+	/// @param first power diagram交点链表头，插入完成后更新
+	/// @param last power diagram交点链表尾，插入完成后更新
+	/// @return 中心点为多余节点无后续计算false，中心点非多余继续计算true 
+	bool power_diagram_insert(Point_d* p, Point_d c, PCell* &first, PCell* &last);
+
+	/// @brief 包含无穷点的PCell是否在直线判断点j侧的判断
+	/// @param cell 包含无穷点的PCell
+	/// @param A 直线统一方程参数
+	/// @param B 
+	/// @param C 
+	/// @param j 判断点j，判断cell是否和j在直线的同一侧
+	/// @param c 中心点c
+	/// @return 在同一侧true，不在同一侧false
+	bool infinate_same_side_judge(PCell* cell, double A, double B, double C, Point_d j, Point_d c);
+
+	/// @brief 显示包含在cell扩展外接圆并在夹角范围中的节点
+	/// @param iter power diagram交点
+	void show_inPCell(PCell* iter);
+
+/// @brief 计算power diagram链中交点扩展权值圆的包含范围，分为交点形成包含无穷点和不包含无穷点两类
+/// ------不包含无穷点------
+	
+	/// @brief 计算pcell的包围盒
+	/// @param pcell 待计算power diagram交点
+	/// @param box 矩形包围盒
+	void pcell_box(PCell* pcell, Box& box);
+
+	/// @brief 判断点p是否在cell扩展外接圆内，同时在中心点c和其两构成点形成的夹角中
+	/// @param p 判断点
+	/// @param cell power diagram交点
+	/// @param c 中心点
+	/// @return 在外扩展圆和夹角中true，其余false
+	bool in_circle_and_angle(Point_d p, PCell* cell, Point_d c);
+
+	/// @brief 获取在同时cell扩展外接圆和夹角中的节点，存储在cell中的ipc中，链表
+	/// @param cell power diagram交点
+	/// @param exbox 中心点初始构造时已查询的包围盒范围
+	/// @param c 中心点
+	void findPoints_in_PCell(PCell* cell, Box exbox, Point_d c);
+
+/// ------包含无穷点------
 
 public:
 	/// @brief 构造函数同时内部执行剖分
