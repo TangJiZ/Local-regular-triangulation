@@ -26,6 +26,13 @@ struct Box
 	int fy_min, fy_max, fx_min, fx_max;
 };
 
+/// @brief 节点在regular triangulaton中的相邻连接节点链表
+struct Nei
+{
+	Point_d* p;
+	Nei* next;
+};
+
 /// @brief 局部方法计算regular三角剖分类
 class Local_Regular
 {
@@ -46,6 +53,8 @@ private:
 	double xcell, ycell;		// 分区单元大小
 	int* bucket;				// 存储每个分区中第一个节点
 	int* next;					// 存储每个节点在分区中的下一个节点，多节点同分区时发挥作用
+
+	std::vector<Nei*> nei;		// 存储每个节点计算完成后的相邻邻居节点
 
 public:
 
@@ -119,6 +128,44 @@ private:
 	void findPoints_in_PCell(PCell* cell, Box exbox, Point_d c);
 
 /// ------包含无穷点------
+	
+	/// @brief x方向上，直线和长方形相交部分，每个xid对应的yid范围
+	struct Bound
+	{
+		int x_min, x_max;	// 通常只使用x_min，当直线垂直于x轴时，单个Bound边可表示所有范围
+		int y_min, y_max;
+	};
+
+	/// @brief 计算外扩展直线和节点外长方形框所围成的网格范围，方向为无穷点对应的方向向量
+	/// @param cell 待计算power diagram交点，包含infinate点
+	/// @param c 中心点，直线为中心点和非infinate点形成
+	/// @param vb 围成的网格范围，x方向逐网格存储
+	void pcell_bound_infinate(PCell* cell, Point_d c, std::vector<Bound>& vb);
+
+	/// @brief 获取在外扩展线内的节点，存储在cell中的ipc中，链表
+	/// @param cell power diagram交点，包含infinate节点
+	/// @param exbox 中心点初始构造时已查询的包围盒范围
+	/// @param c 中心点
+	void findPoints_in_PCell_infinate(PCell* cell, Box exbox, Point_d c);
+
+/// ------******------
+
+	/// @brief 插入节点后，更新需改动交点对应的inPCell（圆内节点），被替代的交点圆内节点要么在新交点圆外，要么在新交点圆内
+	/// @param start 被替代链的链头
+	/// @param end 被替代链的链尾
+	/// @param c 中心节点
+	/// @param new1 新产生交点1
+	/// @param new2 新产生交点2
+	void update_inPCell(PCell* start, PCell* end, Point_d c, PCell* new1, PCell* new2);
+
+	/// @brief 计算包含无穷点的cell外扩直线，并生成一个在外扩直线内部方向的节点
+	/// @param cell	power diagram交点，包含infinate
+	/// @param c 中心节点
+	/// @param A 外扩直线通用参数
+	/// @param B 
+	/// @param C 
+	/// @param p 在外扩直线内部方向一点
+	void compute_ext_line_and_point(PCell* cell, Point_d c, double& A, double& B, double& C, Point_d& p);
 
 public:
 	/// @brief 构造函数同时内部执行剖分

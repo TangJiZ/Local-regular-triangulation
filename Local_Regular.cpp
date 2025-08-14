@@ -362,6 +362,10 @@ bool Local_Regular::power_diagram_insert(Point_d* p, Point_d c, PCell* &first, P
 			/// 更新first
 			first = new1;
 			last = startUp;
+
+			// 更新链中的inPCell
+			end->next = nullptr;
+			update_inPCell(start, end, c, new1, new2);
 		}
 
 		/// 删除start到end
@@ -370,6 +374,16 @@ bool Local_Regular::power_diagram_insert(Point_d* p, Point_d c, PCell* &first, P
 		PCell* now = start;
 		while (now != nullptr)
 		{
+			// 删除ipc
+			inPCell* inp = now->ipc;
+			while (inp != nullptr)
+			{
+				inPCell* t = inp->next;
+				delete inp;
+				inp = t;
+			}
+
+			// 删除cell
 			d = now->next;
 			delete now;
 			now = d;
@@ -518,10 +532,309 @@ void Local_Regular::findPoints_in_PCell(PCell* cell, Box exbox, Point_d c)
 	}
 }
 
+void Local_Regular::pcell_bound_infinate(PCell* cell, Point_d c, std::vector<Bound>& vb)
+{
+	// 查找非infinate点
+	Point_d t;
+	if (cell->p1 == infinate)
+		t = *(cell->p2);
+	else
+		t = *(cell->p1);
+
+	// 计算外扩展直线
+	double A, B, C;
+	line(t, c, A, B, C);
+	double n = sqrt(wmax);	// 移动距离
+	if (A * cell->q.x > 0)	// 当前直线的法向量和power diagram方向向量同向，则外扩方向为直线法向量向后
+	{
+		C = C + n * sqrt(A * A + B * B);
+	}
+	else  // 当前直线的法向量和power diagram方向向量反向，则外扩方向为直线法向量
+	{
+		C = C - n * sqrt(A * A + B * B);
+	}
+
+	// 计算包围范围
+	if (B == 0)		// 外扩展直线垂直于x轴，单个Bound即可表示所有范围
+	{
+		double x = -C / A;
+		int x_id = int((x - xmin) / xcell);
+		if (x_id >= 0 && x_id < xnum)
+		{
+			Bound b;
+			if (cell->q.x > 0)
+			{
+				b.x_min = x_id;
+				b.x_max = xnum - 1;
+			}
+			else
+			{
+				b.x_min = 0;
+				b.x_max = x_id;
+			}
+			b.y_min = 0;
+			b.y_max = ynum - 1;
+			vb.push_back(b);
+		}
+	}
+	else     // 外扩展直线非垂直于x轴
+	{
+		double k = -A / B;	// 直线斜率
+		double change;	// 查询方向y的变化数值
+
+		// 确保有效区域向上时沿着直线y值增大的方向进行，有效区域向下时，沿着y值减小的方向进行
+		int for_start, for_end, step;
+		if (cell->q.y > 0)		// 有效区域向上，沿着直线y值增大的方向
+		{
+			if (k >= 0)
+			{
+				for_start = 0;
+				for_end = xnum;
+				step = 1;
+			}
+			else
+			{
+				for_start = xnum - 1;
+				for_end = 1;	// 循环遍历时采用i * step与for_end进行判断，正常应该是-1，乘以step后使用1
+				step = -1;
+			}
+			change = abs(k) * xcell;
+		}
+		else		// 有效区域向下，沿着直线y值减小的方向
+		{
+			if (k >= 0)
+			{
+				for_start = xnum - 1;
+				for_end = 1;
+				step = -1;
+			}
+			else
+			{
+				for_start = 0;
+				for_end = xnum;
+				step = 1;
+			}
+			change = -abs(k) * xcell;
+		}
+
+		double y_1d;
+		int y_1;
+		
+		if (for_start == 0)
+		{
+			y_1d = -(A * xmin + C) / B;
+			y_1 = int((y_1d - ymin) / ycell);
+		}
+		else
+		{
+			y_1d = -(A * (xmin + xnum * xcell) + C) / B;
+			y_1 = int((y_1d - ymin) / ycell);
+		}
+		
+		for (int i = for_start; i * step < for_end; i = i + step)
+		{
+			double y_2d = y_1d + change;
+			int y_2 = int((y_2d - ymin) / ycell);
+
+			Bound b;
+			int y_min, y_max;
+			if (cell->q.y > 0)	// 有效区域向上，y_2 > y_1
+			{
+				if (y_1 >= ynum)
+					break;
+				else if (y_1 < 0)
+					y_min = 0;
+				else
+					y_min = y_1;
+				y_max = ynum - 1;
+			}
+			else  // 有效区域向下，y_2 < y_1
+			{
+				if (y_1 < 0)
+					break;
+				else if (y_1 >= ynum)
+					y_max = ynum - 1;
+				else
+					y_max = y_1;
+				y_min = 0;
+			}
+
+			b.x_min = i;
+			b.x_max = i;
+			b.y_min = y_min;
+			b.y_max = y_max;
+			vb.push_back(b);
+
+			y_1 = y_2;
+			y_1d = y_2d;
+		}
+	}
+}
+
+void Local_Regular::findPoints_in_PCell_infinate(PCell* cell, Box exbox, Point_d c)
+{
+	std::vector<Bound> vb;
+	pcell_bound_infinate(cell, c, vb);
+
+	// vb显示代码
+	//std::cout << "infinate Bound show: " << std::endl;
+	//if (cell->p1 == infinate)
+	//{
+	//	std::cout << "p1: infinate" << std::endl;
+	//	std::cout << "p2: " << cell->p2->x << " " << cell->p2->y << std::endl;
+	//}
+	//else
+	//{
+	//	std::cout << "p1: " << cell->p1->x << " " << cell->p1->y << std::endl;
+	//	std::cout << "p2: infinate" << std::endl;
+	//}
+	//for (int i = 0; i < vb.size(); i++)
+	//{
+	//	std::cout << "Bound xmin: " << vb[i].x_min << "  xmax: " << vb[i].x_max << "  ymin: " << vb[i].y_min << "  ymax: " << vb[i].y_max << std::endl;
+	//}
+	//std::cout << std::endl;
+
+	for (int k = 0; k < vb.size(); k++)
+	{
+		for (int i = vb[k].x_min; i <= vb[k].x_max; i++)
+		{
+			for (int j = vb[k].y_min; j <= vb[k].y_max; j++)
+			{
+				if (i >= exbox.fx_min && i <= exbox.fx_max && j >= exbox.fy_min && j <= exbox.fy_max)
+					continue;
+				else
+				{
+					int n = bucket[i * ynum + j];
+					while (n != -1)
+					{
+						inPCell* inpcell = new inPCell;
+						inpcell->p = pts + n;
+						inpcell->next = cell->ipc;
+						cell->ipc = inpcell;
+						n = next[n];
+					}
+				}
+			}
+		}
+	}
+}
+
+void Local_Regular::update_inPCell(PCell* start, PCell* end, Point_d c, PCell* new1, PCell* new2)
+{
+	double A1, B1, C1, A2, B2, C2;
+	Point_d p1, p2;
+	bool new1_infinate, new2_infinate;
+
+	// 判断new节点中是否有infinate，有则需进行半平面判断，无则进行圆内判断
+	if (new1->p1 != infinate && new1->p2 != infinate)
+	{
+		new1->r = sqrt(new1->q.w + wmax);
+		new1_infinate = false;
+	}
+	else
+	{
+		compute_ext_line_and_point(new1, c, A1, B1, C1, p1);
+		new1_infinate = true;
+	}
+
+	if (new2->p1 != infinate && new2->p2 != infinate)
+	{
+		new2->r = sqrt(new2->q.w + wmax);
+		new2_infinate = false;
+	}
+	else
+	{
+		compute_ext_line_and_point(new2, c, A2, B2, C2, p2);
+		new2_infinate = true;
+	}
+
+	PCell* s = start;
+	while (s != nullptr)	// start end链判断
+	{
+		inPCell* ip = s->ipc;
+		while (ip != nullptr)	// 链上节点内部ipc节点链判断
+		{
+			inPCell* next = ip->next;
+			bool in1, in2;
+			if (new1_infinate)	// 有无穷点，进行半平面判断
+			{
+				in1 = same_side_judge(p1, *(ip->p), A1, B1, C1);
+			}
+			else    // 无无穷点，进行园内及夹角内判断
+			{
+				in1 = in_circle_and_angle(*(ip->p), new1, c);
+			}
+
+			if (in1)
+			{
+				inPCell* t;
+				t = new1->ipc;
+				new1->ipc = ip;
+				ip->next = t;
+			}
+			else
+			{
+				if (new2_infinate)	// 有无穷点，进行半平面判断
+				{
+					in2 = same_side_judge(p2, *(ip->p), A2, B2, C2);
+				}
+				else    // 无无穷点，进行园内及夹角内判断
+				{
+					in2 = in_circle_and_angle(*(ip->p), new2, c);
+				}
+
+				if (in2)
+				{
+					inPCell* t;
+					t = new2->ipc;
+					new2->ipc = ip;
+					ip->next = t;
+				}
+				else   // 不在new1或new2中，则删除当前inPCell
+				{
+					delete ip;
+				}
+			}
+
+			ip = next;
+		}
+
+		s = s->next;
+	}
+}
+
+void Local_Regular::compute_ext_line_and_point(PCell* cell, Point_d c, double& A, double& B, double& C, Point_d& p)
+{
+	// 查找非infinate点
+	Point_d t;
+	if (cell->p1 == infinate)
+		t = *(cell->p2);
+	else
+		t = *(cell->p1);
+
+	// 计算外扩展直线
+	A, B, C;
+	line(t, c, A, B, C);
+	double n = sqrt(wmax);	// 移动距离
+	if (A * cell->q.x > 0)	// 当前直线的法向量和power diagram方向向量同向，则外扩方向为直线法向量向后
+	{
+		C = C + n * sqrt(A * A + B * B);
+	}
+	else  // 当前直线的法向量和power diagram方向向量反向，则外扩方向为直线法向量
+	{
+		C = C - n * sqrt(A * A + B * B);
+	}
+
+	p.x = t.x + cell->q.x;
+	p.y = t.y + cell->q.y;
+}
+
 Local_Regular::Local_Regular(Point_d* p, int num)
 {
 	pts = p;
 	n = num;
+
+	nei.resize(n);
 
 	// 获取点集最大最小值
 	getMinMax_ptr();
@@ -530,7 +843,7 @@ Local_Regular::Local_Regular(Point_d* p, int num)
 	partition();
 
 	// 对点集中每个节点进行局部计算，得到节点的全局邻居连接
-	for (int i = 4; i < 5; i++)
+	for (int i = 0; i < n; i++)
 	{
 		// 外扩展计算查询邻近节点，保证节点数量至少为2
 		Box box;		// 外扩展查找过的网格包围盒
@@ -551,12 +864,20 @@ Local_Regular::Local_Regular(Point_d* p, int num)
 		power_diagram_build_initial(nf, pts[i], first, last);
 		show_pcell(first);
 
+		// 当前中心点是否为多余点
+		bool valid = true;
 		// 逐个加入邻近节点，构造完整的初始power diagram
 		for (int j = 2; j < nf.size(); j++)
 		{
-			power_diagram_insert(pts + nf[j], pts[i], first, last);
+			valid = power_diagram_insert(pts + nf[j], pts[i], first, last);
+			if (!valid)
+				break;
 		}
 		//show_pcell(first);
+
+		// 当前中心点非有效节点，当前中心节点的邻域连接点为NULL，无需后续计算步骤
+		if (!valid)
+			continue;
 
 		// 计算初始power diagram交点链表单元PCell的扩展权值圆内节点链表
 		PCell* iter = first;
@@ -568,10 +889,73 @@ Local_Regular::Local_Regular(Point_d* p, int num)
 			}
 			else
 			{
-
+				findPoints_in_PCell_infinate(iter, box, pts[i]);
 			}
 			iter = iter->next;
 		} while (iter != first);
-		show_inPCell(first);
+		//show_inPCell(first);
+
+		// 循环遍历power diagram链，不断加入节点并更新范围内节点链表，直到无节点包含
+		bool has_point = true;		// 是否存在power diagram交点包含圆内节点，存在则需进行下一轮循环，无则计算完成
+		while (has_point)		// 每次循环遍历完整链一次
+		{
+			has_point = false;
+			iter = first;
+			do
+			{
+				Point_d* p;
+				// 存在圆内点，取出首点，修改ipc链表，修改has_point为true，需进行下次循环判断
+				if (iter->ipc != nullptr)
+				{
+					has_point = true;
+					p = iter->ipc->p;
+					inPCell* del = iter->ipc;
+					iter->ipc = iter->ipc->next;
+					delete del;
+				}
+				else
+				{
+					iter = iter->next;
+					continue;
+				}
+
+				valid = power_diagram_insert(p, pts[i], first, last);
+				if (!valid)
+				{
+					has_point = false;
+					break;
+				}
+
+				iter = iter->next;
+			} while (iter != first);
+		}
+
+		if (!valid)		// 当前中心点为多余点，无需操作
+			continue;
+		else			// 当前中心点非多余，统一保存邻居连接节点
+		{
+			last->next = nullptr;
+			PCell* pc = first;
+			while (pc != nullptr)
+			{
+				Nei* e = new Nei;
+				e->p = pc->p1;
+				e->next = nei[i];
+				nei[i] = e;
+				
+				pc = pc->next;
+			}
+		}
+
+		std::cout << "邻居连接点：" << std::endl;
+		//std::cout << "num: " << i << std::endl;
+		int m = 0;
+		Nei* ni = nei[i];
+		while (ni != nullptr)
+		{
+			std::cout << "seq: " << m << ":  x: " << ni->p->x << "  y: " << ni->p->y << std::endl;
+			ni = ni->next;
+		}
+		std::cout << std::endl;
 	}
 }
