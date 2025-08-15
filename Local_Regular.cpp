@@ -1,4 +1,7 @@
 #include <iostream>
+#include <fstream>
+#include <sstream>
+#include <filesystem>
 
 #include "Local_Regular.h"
 #include "regular_common.h"
@@ -752,6 +755,7 @@ void Local_Regular::update_inPCell(PCell* start, PCell* end, Point_d c, PCell* n
 	while (s != nullptr)	// start end链判断
 	{
 		inPCell* ip = s->ipc;
+		s->ipc = nullptr;
 		while (ip != nullptr)	// 链上节点内部ipc节点链判断
 		{
 			inPCell* next = ip->next;
@@ -778,7 +782,7 @@ void Local_Regular::update_inPCell(PCell* start, PCell* end, Point_d c, PCell* n
 				{
 					in2 = same_side_judge(p2, *(ip->p), A2, B2, C2);
 				}
-				else    // 无无穷点，进行园内及夹角内判断
+				else    // 无无穷点，进行圆内及夹角内判断
 				{
 					in2 = in_circle_and_angle(*(ip->p), new2, c);
 				}
@@ -829,6 +833,47 @@ void Local_Regular::compute_ext_line_and_point(PCell* cell, Point_d c, double& A
 	p.y = t.y + cell->q.y;
 }
 
+void Local_Regular::get_triangle()
+{
+	for (int i = 0; i < nei.size(); i++)
+	{
+		if (nei[i] != nullptr)
+		{
+			valid_num++;
+
+			Nei* t = nei[i];
+			Point_d* c = pts + i;
+			while (t->next != nullptr)
+			{
+				// 只和地址大于自身的节点形成三角形
+				if (t->p > c && t->next->p > c)
+				{
+					// 顺时针序排序才能形成三角形
+					if (!cross_product(*(t->p), *(t->next->p), pts[i]))
+					{
+						RTriangle r{ pts[i], *(t->p), *(t->next->p) };
+						rtri.push_back(r);
+					}
+
+				}
+				t = t->next;
+			}
+
+			// 最后节点和第一节点再判断一次
+			if (t->p > c && nei[i]->p > c)
+			{
+				if (!cross_product(*(t->p), *(nei[i]->p), pts[i]))
+				{
+					RTriangle r{ pts[i], *(t->p), *(nei[i]->p) };
+					rtri.push_back(r);
+				}
+			}
+		}
+		else
+			invalid_num++;
+	}
+}
+
 Local_Regular::Local_Regular(Point_d* p, int num)
 {
 	pts = p;
@@ -843,7 +888,7 @@ Local_Regular::Local_Regular(Point_d* p, int num)
 	partition();
 
 	// 对点集中每个节点进行局部计算，得到节点的全局邻居连接
-	for (int i = 0; i < n; i++)
+	for (int i = 9; i < n; i++)
 	{
 		// 外扩展计算查询邻近节点，保证节点数量至少为2
 		Box box;		// 外扩展查找过的网格包围盒
@@ -862,7 +907,7 @@ Local_Regular::Local_Regular(Point_d* p, int num)
 
 		// 计算前两邻居点和当前中心计算节点形成的初始power diagram
 		power_diagram_build_initial(nf, pts[i], first, last);
-		show_pcell(first);
+		//show_pcell(first);
 
 		// 当前中心点是否为多余点
 		bool valid = true;
@@ -873,7 +918,7 @@ Local_Regular::Local_Regular(Point_d* p, int num)
 			if (!valid)
 				break;
 		}
-		//show_pcell(first);
+		show_pcell(first);
 
 		// 当前中心点非有效节点，当前中心节点的邻域连接点为NULL，无需后续计算步骤
 		if (!valid)
@@ -893,7 +938,7 @@ Local_Regular::Local_Regular(Point_d* p, int num)
 			}
 			iter = iter->next;
 		} while (iter != first);
-		//show_inPCell(first);
+		show_inPCell(first);
 
 		// 循环遍历power diagram链，不断加入节点并更新范围内节点链表，直到无节点包含
 		bool has_point = true;		// 是否存在power diagram交点包含圆内节点，存在则需进行下一轮循环，无则计算完成
@@ -901,6 +946,7 @@ Local_Regular::Local_Regular(Point_d* p, int num)
 		{
 			has_point = false;
 			iter = first;
+			PCell* f = first;
 			do
 			{
 				Point_d* p;
@@ -920,30 +966,43 @@ Local_Regular::Local_Regular(Point_d* p, int num)
 				}
 
 				valid = power_diagram_insert(p, pts[i], first, last);
+				show_pcell(first);
+				show_inPCell(first);
 				if (!valid)
 				{
 					has_point = false;
 					break;
 				}
 
-				iter = iter->next;
+				if (f == first)	// first未发生变化，继续查询即可
+					iter = iter->next;
+				else     // first发生变化，有新节点插入，此时需从未发生变化的节点继续查询，并更新f
+				{
+					iter = first->next->next;
+					f = first;
+				}
 			} while (iter != first);
 		}
 
 		if (!valid)		// 当前中心点为多余点，无需操作
 			continue;
-		else			// 当前中心点非多余，统一保存邻居连接节点
+		else			// 当前中心点非多余，统一保存邻居连接节点，由于链表插入方式，Nei中节点为顺时针保存
 		{
 			last->next = nullptr;
 			PCell* pc = first;
 			while (pc != nullptr)
 			{
-				Nei* e = new Nei;
-				e->p = pc->p1;
-				e->next = nei[i];
-				nei[i] = e;
+				if (pc->p1 != infinate)		// infinate节点无需保存到结果中
+				{
+					Nei* e = new Nei;
+					e->p = pc->p1;
+					e->next = nei[i];
+					nei[i] = e;
+				}
 				
-				pc = pc->next;
+				PCell* t = pc->next;
+				delete pc;
+				pc = t;
 			}
 		}
 
@@ -955,7 +1014,88 @@ Local_Regular::Local_Regular(Point_d* p, int num)
 		{
 			std::cout << "seq: " << m << ":  x: " << ni->p->x << "  y: " << ni->p->y << std::endl;
 			ni = ni->next;
+			m++;
 		}
 		std::cout << std::endl;
 	}
+
+	// 获取计算完成的总三角网
+	get_triangle();
+}
+
+void Local_Regular::read_triangle(std::string path)
+{
+	std::ifstream file(path);
+	std::string line1, line2, line3;
+	Point_d p1, p2, p3;
+
+	while (!file.eof())
+	{
+		getline(file, line1);
+		getline(file, line2);
+		getline(file, line3);
+
+		std::istringstream iss1(line1), iss2(line2), iss3(line3);
+		int seq;
+		iss1 >> seq >> p1.x >> p1.y >> p1.w;
+		iss2 >> seq >> p2.x >> p2.y >> p2.w;
+		iss3 >> seq >> p3.x >> p3.y >> p3.w;
+
+		rtri.push_back(RTriangle{ p1, p2, p3 });
+	}
+}
+
+void Local_Regular::saveAndPlot(std::string name, std::string path, bool plot)
+{
+	using std::string;
+	using std::ofstream;
+
+	/// 创建path下的name文件夹
+	string filePath = path + '/' + name;
+	if (!std::filesystem::create_directory(filePath))
+	{
+		/*cout << "文件夹创建失败" << endl;*/
+	}
+
+	/// 保存三角形文件
+	string triangulationFilePath = filePath + "/triangulation.txt";
+	ofstream triangulationFile(triangulationFilePath);
+	triangulationFile << std::fixed << std::setprecision(12);
+	for (int i = 0; i < rtri.size(); i++)
+	{
+		triangulationFile << i << ' ' << rtri[i].a.x << ' ' << rtri[i].a.y << ' ' << rtri[i].a.w << std::endl;
+		triangulationFile << i << ' ' << rtri[i].b.x << ' ' << rtri[i].b.y << ' ' << rtri[i].b.w << std::endl;
+		triangulationFile << i << ' ' << rtri[i].c.x << ' ' << rtri[i].c.y << ' ' << rtri[i].c.w << std::endl;
+	}
+
+	/// 绘图
+	if (plot)
+	{
+		string scriptPath = "D:/Microsoft Visual Studio/code/Regular_Triangulation/regular_2d/code/plotScript.py";;
+		// 构造完整的命令字符串
+		std::string command = "python \"" + scriptPath + "\" \"" + triangulationFilePath + "\" \"" + name + "\"";
+
+		// 使用system()函数调用Python脚本
+		int result = system(command.c_str());
+	}
+}
+
+constexpr double epsilon = 1e-12;
+
+bool RTriangle::operator==(const RTriangle& other) const
+{
+	Point_d pV[3]{ a, b, c };
+	Point_d otherpV[3]{ other.a, other.b, other.c };
+	for (int i = 0; i < 3; i++)
+	{
+		int j = 0;
+		for (; j < 3; j++)
+		{
+			if (abs(pV[i].x - otherpV[j].x) < epsilon && abs(pV[i].y - otherpV[j].y) < epsilon)
+				break;
+		}
+		if (j == 3)
+			return false;
+	}
+	return true;
 }

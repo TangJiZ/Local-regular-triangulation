@@ -19,6 +19,7 @@ Point_d* read_points(std::string path, int num)
 		iss.str(line);
 		iss >> points[i].x;
 		iss >> points[i].y;
+		iss >> points[i].w;
 	}
 
 	file.close();

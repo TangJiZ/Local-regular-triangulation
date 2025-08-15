@@ -1,5 +1,8 @@
 #pragma once
+#include <unordered_set>
+
 #include "Point_d.h"
+#include "Local_Regular.h"
 
 /// @brief 计算两点的power distance，point2到point1的距离，减去的是point1的权值
 /// @param point1 计算点1
@@ -71,3 +74,20 @@ void line(Point_d p1, Point_d p2, double& A, double& B, double& C);
 /// @param c 相对点
 /// @return 顺时针false，逆时针true
 bool cross_product(Point_d a, Point_d b, Point_d c);
+
+/// @brief compare_RT返回类型，包含比较结果，各三角网的独有部分
+struct CompareResult
+{
+	bool equal = true;
+	std::unordered_set<RTriangle, RTriangleHash> unSet1;
+	std::unordered_set<RTriangle, RTriangleHash> unSet2;
+};
+
+/// @brief 比较两个Local_Regular的三角网是否相同
+/// @param rt1 待比较三角网1
+/// @param rt2 待比较三角网2
+/// @return 比较结果及独有部分
+CompareResult compare_RT(Local_Regular* rt1, Local_Regular* rt2);
+
+
+void compareRTSaveAndPlot(CompareResult& compareRt, std::string fileName, std::string path = "./", bool plot = false);

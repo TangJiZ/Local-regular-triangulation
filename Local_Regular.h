@@ -33,6 +33,32 @@ struct Nei
 	Nei* next;
 };
 
+/// @brief regular triangle存储
+struct RTriangle
+{
+	Point_d a, b, c;
+
+	/// @brief 重载==运算符
+	/// @param other 待比较对象
+	/// @return 是否相同
+	bool operator==(const RTriangle& other) const;
+};
+
+/// @brief RTriangleHash结构体，用于包含RTriangle的unorder_set等集合类型创建时的hash模板输入
+struct RTriangleHash
+{
+	size_t operator()(const RTriangle& rt) const
+	{
+		double all = 0;
+		all += rt.a.x + rt.a.y;
+		all += rt.b.x + rt.b.y;
+		all += rt.c.x + rt.c.y;
+		/// 截断double到小数点后15位，double的误差会导致hash的计算不同，从而使得比较时产生错误
+		all = floor(all * 1e15) / 1e15;
+		return std::hash<double>{}(all);
+	}
+};
+
 /// @brief 局部方法计算regular三角剖分类
 class Local_Regular
 {
@@ -57,6 +83,10 @@ private:
 	std::vector<Nei*> nei;		// 存储每个节点计算完成后的相邻邻居节点
 
 public:
+
+	std::vector<RTriangle> rtri;		// 存储最终三角形集合
+	int valid_num = 0;					// 有效节点数量
+	int invalid_num = 0;				// 无效节点数量
 
 
 /// @brief function
@@ -167,10 +197,26 @@ private:
 	/// @param p 在外扩直线内部方向一点
 	void compute_ext_line_and_point(PCell* cell, Point_d c, double& A, double& B, double& C, Point_d& p);
 
+	/// @brief 获取最终三角形集合，每个节点只和编号比自身大的节点形成三角形
+	void get_triangle();
+
 public:
 	/// @brief 构造函数同时内部执行剖分
 	/// @param p 待计算点集
 	/// @param num 点集中节点数量
 	Local_Regular(Point_d* p, int num);
+
+	/// @brief 默认构造函数
+	Local_Regular() {}
+
+	/// @brief 读取三角形
+	/// @param path 读取文件路径
+	void read_triangle(std::string path);
+
+	/// @brief 保存，绘制三角网
+	/// @param name 文件名，不含后缀；数据文件自动为文件名+txt，图像文件自动为文件名+jpg
+	/// @param path 文件保存路径
+	/// @param plot 选择是否绘制图像
+	void saveAndPlot(std::string name, std::string path, bool plot);
 };
 

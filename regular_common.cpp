@@ -1,3 +1,10 @@
+#include <string>
+#include <filesystem>
+#include <fstream>
+#include <sstream>
+#include <iostream>
+#include <iomanip>
+
 #include "regular_common.h"
 
 double compute_weight_distance(Point_d point1, Point_d point2)
@@ -43,7 +50,8 @@ bool same_side_judge(Point_d point1, Point_d point2, double A, double B, double 
 {
 	double D1 = A * point1.x + B * point1.y + C;
 	double D2 = A * point2.x + B * point2.y + C;
-	if (D1 * D2 >= 0)
+	double D = D1 * D2;
+	if (abs(D) < 1e-13 || D >= 0)
 		return true;
 	else
 		return false;
@@ -121,4 +129,121 @@ bool cross_product(Point_d a, Point_d b, Point_d c)
 		return true;
 	else
 		return false;
+}
+
+CompareResult compare_RT(Local_Regular* rt1, Local_Regular* rt2)
+{
+	std::unordered_set<RTriangle, RTriangleHash> unSet1;
+	for (int i = 0; i < rt1->rtri.size(); i++)
+	{
+		unSet1.insert(rt1->rtri[i]);
+	}
+
+	std::unordered_set<RTriangle, RTriangleHash> unSet2;
+	for (int i = 0; i < rt2->rtri.size(); i++)
+	{
+		unSet2.insert(rt2->rtri[i]);
+	}
+
+	CompareResult compareResult;
+	if (unSet1 == unSet2)
+	{
+		compareResult.equal = true;
+		return compareResult;
+	}
+	else
+	{
+		/// 计算unSet1和unSet2的差集
+		std::unordered_set<RTriangle, RTriangleHash> differenceSet1;
+		for (RTriangle rt : unSet1)
+		{
+			if (unSet2.find(rt) == unSet2.end())
+			{
+				differenceSet1.insert(rt);
+			}
+		}
+		std::unordered_set<RTriangle, RTriangleHash> differenceSet2;
+		for (RTriangle rt : unSet2)
+		{
+			if (unSet1.find(rt) == unSet1.end())
+			{
+				differenceSet2.insert(rt);
+			}
+		}
+		compareResult.equal = false;
+		compareResult.unSet1 = differenceSet1;
+		compareResult.unSet2 = differenceSet2;
+		return compareResult;
+	}
+}
+
+void compareRTSaveAndPlot(CompareResult& compareRt, std::string fileName, std::string path, bool plot)
+{
+	using std::string;
+	using std::ofstream;
+	using std::endl;
+	using std::setprecision;
+
+	/// 创建path下的name文件夹
+	string filePath = path + '/' + fileName;
+	if (!std::filesystem::create_directory(filePath))
+	{
+		//cout << "文件夹创建失败" << endl;
+	}
+
+	/// 保存比较结果总结
+	string summaryPath = filePath + "/summary.txt";
+	ofstream file(summaryPath);
+	file << std::fixed << setprecision(15);
+	file << "结果比较是否相同：" << compareRt.equal << endl;
+	file << "比较对象1独有三角形个数：" << compareRt.unSet1.size() << endl;
+	int i = 0;
+	file << "比较对象2独有三角形个数：" << compareRt.unSet2.size() << endl;
+	file.close();
+
+	/// 单独保存各对象的独有三角形文件
+	string set1Path = filePath + "/set1.txt";
+	ofstream set1file(set1Path);
+	set1file << std::fixed << setprecision(12);
+	i = 0;
+	for (const RTriangle& rt : compareRt.unSet1)
+	{
+		set1file << i << ' ' << rt.a.x << ' ' << rt.a.y << ' ' << rt.a.w << endl;
+		set1file << i << ' ' << rt.b.x << ' ' << rt.b.y << ' ' << rt.b.w << endl;
+		set1file << i << ' ' << rt.c.x << ' ' << rt.c.y << ' ' << rt.c.w << endl;
+		i++;
+	}
+	set1file.close();
+
+	string set2Path = filePath + "/set2.txt";
+	ofstream set2file(set2Path);
+	set2file << std::fixed << setprecision(12);
+	i = 0;
+	for (const RTriangle& rt : compareRt.unSet2)
+	{
+		set2file << i << ' ' << rt.a.x << ' ' << rt.a.y << ' ' << rt.a.w << endl;
+		set2file << i << ' ' << rt.b.x << ' ' << rt.b.y << ' ' << rt.b.w << endl;
+		set2file << i << ' ' << rt.c.x << ' ' << rt.c.y << ' ' << rt.c.w << endl;
+		i++;
+	}
+	set2file.close();
+
+	/// 绘图
+	if (plot)
+	{
+		/// set1绘图
+		string scriptPath = "D:/Microsoft Visual Studio/code/Regular_Triangulation/regular_2d/code/plotScript.py";
+		string name1 = "set1";
+		// 构造完整的命令字符串
+		std::string command1 = "python \"" + scriptPath + "\" \"" + set1Path + "\" \"" + name1 + "\"";
+		// 使用system()函数调用Python脚本
+		system(command1.c_str());
+
+		/// set2绘图
+		string name2 = "set2";
+		// 构造完整的命令字符串
+		std::string command2 = "python \"" + scriptPath + "\" \"" + set2Path + "\" \"" + name2 + "\"";
+		// 使用system()函数调用Python脚本
+		system(command2.c_str());
+	}
 }
