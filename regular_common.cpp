@@ -51,7 +51,7 @@ bool same_side_judge(Point_d point1, Point_d point2, double A, double B, double 
 	double D1 = A * point1.x + B * point1.y + C;
 	double D2 = A * point2.x + B * point2.y + C;
 	double D = D1 * D2;
-	if (abs(D) < 1e-13 || D >= 0)
+	if (abs(D) < epsilon || D >= 0)
 		return true;
 	else
 		return false;

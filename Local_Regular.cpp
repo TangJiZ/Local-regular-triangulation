@@ -28,8 +28,11 @@ void Local_Regular::partition()
 	double x = xmax - xmin;
 	double y = ymax - ymin;
 
-	xnum = int(sqrt(n * x / y)) + 1;
-	ynum = int(sqrt(n * y / x)) + 1;
+	//xnum = int(sqrt(n * x / y)) + 1;
+	//ynum = int(sqrt(n * y / x)) + 1;
+
+	xnum = int(sqrt(n * x / y) / 2);
+	ynum = int(sqrt(n * y / x) / 2);
 
 	xcell = x / xnum;
 	ycell = y / ynum;
@@ -406,6 +409,9 @@ bool Local_Regular::infinate_same_side_judge(PCell* cell, double A, double B, do
 
 	double Ap, Bp, Cp;
 	weightedBisector(*p, c, Ap, Bp, Cp);
+
+	if (abs(Ap - A) < epsilon && abs(Bp - B) < epsilon && abs(Cp - C) < epsilon)
+		return true;
 
 	double x, y;
 	intersection(A, B, C, Ap, Bp, Cp, x, y);
@@ -888,19 +894,19 @@ Local_Regular::Local_Regular(Point_d* p, int num)
 	partition();
 
 	// 对点集中每个节点进行局部计算，得到节点的全局邻居连接
-	for (int i = 9; i < n; i++)
+	for (int i = 0; i < n; i++)
 	{
 		// 外扩展计算查询邻近节点，保证节点数量至少为2
 		Box box;		// 外扩展查找过的网格包围盒
 		std::vector<int> nf;
 		near_find(pts + i, nf, box);
 
-		std::cout << "point: " << i << std::endl;
-		for (int i = 0; i < nf.size(); i++)
-		{
-			std::cout << "near " << i << ": " << nf[i] << std::endl;
-		}
-		std::cout << std::endl;
+		//std::cout << "point: " << i << std::endl;
+		//for (int i = 0; i < nf.size(); i++)
+		//{
+		//	std::cout << "near " << i << ": " << nf[i] << std::endl;
+		//}
+		//std::cout << std::endl;
 
 		// power diagram交点链表，环形
 		PCell* first, * last;
@@ -915,10 +921,11 @@ Local_Regular::Local_Regular(Point_d* p, int num)
 		for (int j = 2; j < nf.size(); j++)
 		{
 			valid = power_diagram_insert(pts + nf[j], pts[i], first, last);
+			//show_pcell(first);
 			if (!valid)
 				break;
 		}
-		show_pcell(first);
+		//show_pcell(first);
 
 		// 当前中心点非有效节点，当前中心节点的邻域连接点为NULL，无需后续计算步骤
 		if (!valid)
@@ -938,7 +945,7 @@ Local_Regular::Local_Regular(Point_d* p, int num)
 			}
 			iter = iter->next;
 		} while (iter != first);
-		show_inPCell(first);
+		//show_inPCell(first);
 
 		// 循环遍历power diagram链，不断加入节点并更新范围内节点链表，直到无节点包含
 		bool has_point = true;		// 是否存在power diagram交点包含圆内节点，存在则需进行下一轮循环，无则计算完成
@@ -966,8 +973,8 @@ Local_Regular::Local_Regular(Point_d* p, int num)
 				}
 
 				valid = power_diagram_insert(p, pts[i], first, last);
-				show_pcell(first);
-				show_inPCell(first);
+				//show_pcell(first);
+				//show_inPCell(first);
 				if (!valid)
 				{
 					has_point = false;
@@ -1006,17 +1013,17 @@ Local_Regular::Local_Regular(Point_d* p, int num)
 			}
 		}
 
-		std::cout << "邻居连接点：" << std::endl;
-		//std::cout << "num: " << i << std::endl;
-		int m = 0;
-		Nei* ni = nei[i];
-		while (ni != nullptr)
-		{
-			std::cout << "seq: " << m << ":  x: " << ni->p->x << "  y: " << ni->p->y << std::endl;
-			ni = ni->next;
-			m++;
-		}
-		std::cout << std::endl;
+		//std::cout << "邻居连接点：" << std::endl;
+		////std::cout << "num: " << i << std::endl;
+		//int m = 0;
+		//Nei* ni = nei[i];
+		//while (ni != nullptr)
+		//{
+		//	std::cout << "seq: " << m << ":  x: " << ni->p->x << "  y: " << ni->p->y << std::endl;
+		//	ni = ni->next;
+		//	m++;
+		//}
+		//std::cout << std::endl;
 	}
 
 	// 获取计算完成的总三角网
@@ -1079,8 +1086,6 @@ void Local_Regular::saveAndPlot(std::string name, std::string path, bool plot)
 		int result = system(command.c_str());
 	}
 }
-
-constexpr double epsilon = 1e-12;
 
 bool RTriangle::operator==(const RTriangle& other) const
 {

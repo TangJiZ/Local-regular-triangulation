@@ -4,6 +4,8 @@
 #include "Point_d.h"
 #include "Local_Regular.h"
 
+constexpr double epsilon = 1e-15;
+
 /// @brief 计算两点的power distance，point2到point1的距离，减去的是point1的权值
 /// @param point1 计算点1
 /// @param point2 计算点2

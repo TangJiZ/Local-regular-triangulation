@@ -16,8 +16,8 @@ int main()
 	//Point_d points[7] = { a, b, c, d, e, f, g };
 	//Local_Regular lr(points, 7);
 
-	int num = 20;
-	int prop = 100;
+	int num = 1600000;
+	int prop = 6;
 	std::string path = "D:/Microsoft Visual Studio/code/Triangulation/data";
 	std::string pathIn = path + "/" + std::to_string(num) + "-" + std::to_string(prop) + "%/" + std::to_string(num) + "_in.txt";
 	Point_d* points = read_points(pathIn, num);
@@ -32,13 +32,13 @@ int main()
 	//}
 
 	std::string outPath = "C:/Users/Ã∆ºÃ÷›/Desktop/data";
-	lr.saveAndPlot("lr", outPath, true);
+	lr.saveAndPlot("lr", outPath, false);
 	std::string path1 = path + "/" + std::to_string(num) + "-" + std::to_string(prop) + "%/" + std::to_string(num) + "_out.txt";
 	Local_Regular lr2;
 	lr2.read_triangle(path1);
-	lr2.saveAndPlot("lr2", outPath, true);
+	lr2.saveAndPlot("lr2", outPath, false);
 	CompareResult cr = compare_RT(&lr, &lr2);
-	compareRTSaveAndPlot(cr, "compareTest", outPath, true);
+	compareRTSaveAndPlot(cr, "compareTest", outPath, false);
 
 	return 0;
 }
